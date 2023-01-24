@@ -1,18 +1,17 @@
 
-
 ###################################################
 # Exercise 5 - Natural Language Processing 67658  #
 ###################################################
 
 import numpy as np
+from matplotlib import pyplot
 
-#[’comp.graphics’, ’rec.sport.baseball’,’sci.electronics’, ’talk.politics.guns’]
-# subset of categories that we will use
 category_dict = {'comp.graphics': 'computer graphics',
                  'rec.sport.baseball': 'baseball',
                  'sci.electronics': 'science, electronics',
                  'talk.politics.guns': 'politics, guns'
                  }
+
 
 def get_data(categories=None, portion=1.):
     """
@@ -28,7 +27,7 @@ def get_data(categories=None, portion=1.):
                                    random_state=21)
 
     # train
-    train_len = int(portion*len(data_train.data))
+    train_len = int(portion * len(data_train.data))
     x_train = np.array(data_train.data[:train_len])
     y_train = data_train.target[:train_len]
     # remove empty entries
@@ -64,7 +63,6 @@ def linear_classification(portion=1.):
     return accuracy
 
 
-
 # Q2
 def transformer_classification(portion=1.):
     """
@@ -78,6 +76,7 @@ def transformer_classification(portion=1.):
         """
         Dataset object
         """
+
         def __init__(self, encodings, labels):
             self.encodings = encodings
             self.labels = labels
@@ -92,6 +91,7 @@ def transformer_classification(portion=1.):
 
     from datasets import load_metric
     metric = load_metric("accuracy")
+
     def compute_metrics(eval_pred):
         logits, labels = eval_pred
         predictions = np.argmax(logits, axis=-1)
@@ -120,18 +120,11 @@ def transformer_classification(portion=1.):
                                       num_train_epochs=5,
                                       weight_decay=0.01,
                                       learning_rate=5e-5)
-    trainer = Trainer(model=model, args=training_args, train_dataset=train_dataset, eval_dataset=test_dataset, compute_metrics=compute_metrics)
+    trainer = Trainer(model=model, args=training_args, train_dataset=train_dataset, eval_dataset=test_dataset,
+                      compute_metrics=compute_metrics)
     trainer.train()
-    # Evaluate the trained model on the test set
     result = trainer.evaluate()
-    # return the classification accuracy
     return result['eval_accuracy']
-
-
-
-    # Add your code here
-    # see https://huggingface.co/docs/transformers/v4.25.1/en/quicktour#trainer-a-pytorch-optimized-training-loop
-    # Use the DataSet object defined above. No need for a DataCollator
 
 
 # Q3
@@ -145,32 +138,51 @@ def zeroshot_classification(portion=1.):
     from sklearn.metrics import accuracy_score
     import torch
     x_train, y_train, x_test, y_test = get_data(categories=category_dict.keys(), portion=portion)
-    clf = pipeline("zero-shot-classification", model='cross-encoder/nli-MiniLM2-L6-H768',device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
+    clf = pipeline("zero-shot-classification", model='cross-encoder/nli-MiniLM2-L6-H768',
+                   device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
     candidate_labels = list(category_dict.values())
-    x_train, y_train, x_test, y_test = get_data(categories=category_dict.keys(), portion=portion)
     predictions = clf(x_test, candidate_labels=candidate_labels)
     predictions = [p['labels'][0] for p in predictions]
     y_test = [list(category_dict.values())[i] for i in y_test]
     accuracy = accuracy_score(y_test, predictions)
+    print("\nZero-shot result:")
     return accuracy
 
-    # Add your code here
-    # see https://huggingface.co/docs/transformers/v4.25.1/en/main_classes/pipelines#transformers.ZeroShotClassificationPipeline
+
+def graphs(result, portions, ylabel, xlabel, title):
+    pyplot.title(title)
+    pyplot.plot(portions, result, label="Accuracy")
+    pyplot.xlabel(xlabel)
+    pyplot.ylabel(ylabel)
+    pyplot.legend()
+    pyplot.show()
 
 
 if __name__ == "__main__":
-    portions = [0.1, 0.5, 1.]
+    portions = [0.1, 0.5, 1.0]
+    result_linear_classification = []
     # Q1
     print("Logistic regression results:")
     for p in portions:
         print(f"Portion: {p}")
-        print(linear_classification(p))
+        result = linear_classification(p)
+        result_linear_classification.append(result)
+        print(result)
+    graphs(result_linear_classification, portions, "Accuracy", "Portion",
+           "Model 1 : accuracy results as a function of the portion of the data")
 
+    result_transformer_classification = []
     # Q2
     print("\nFinetuning results:")
     for p in portions:
         print(f"Portion: {p}")
-        print(transformer_classification(portion=p))
+        result = transformer_classification(portion=p)
+        result_transformer_classification.append(result)
+        print(result)
+    for i in range(len(result_transformer_classification)):
+        print("Portion ", portions[i], " : ", result_transformer_classification[i])
+    graphs(result_transformer_classification, portions, "Accuracy", "Portion",
+           "Model 2 : accuracy results as a function of the portion of the data")
 
     # Q3
     print("\nZero-shot result:")
